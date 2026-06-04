@@ -1,101 +1,37 @@
 import pandas as pd
-import numpy as np
 import pickle
 
 from sklearn.model_selection import train_test_split
-from tensorflow.keras.preprocessing.text import Tokenizer
-from tensorflow.keras.preprocessing.sequence import pad_sequences
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
 
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Embedding,LSTM,Dense,Dropout
-from tensorflow.keras.callbacks import EarlyStopping
-
-# ==========================
-# LOAD DATA
-# ==========================
 df = pd.read_csv("data/data.csv")
 
-X = df["text"].astype(str)
+X = df["text"]
 y = df["label"]
 
-# ==========================
-# TOKENIZATION
-# ==========================
-max_words = 10000
-max_len = 100
-
-tokenizer = Tokenizer(num_words=max_words,oov_token="<OOV>")
-tokenizer.fit_on_texts(X)
-
-sequences = tokenizer.texts_to_sequences(X)
-X_pad = pad_sequences(
-    sequences,
-    maxlen=max_len,
-    padding='post'
+vectorizer = TfidfVectorizer(
+    max_features=5000,
+    stop_words=None
 )
 
-# ==========================
-# SPLIT DATA
-# ==========================
+X_tfidf = vectorizer.fit_transform(X)
+
 X_train, X_test, y_train, y_test = train_test_split(
-    X_pad,
+    X_tfidf,
     y,
     test_size=0.2,
     random_state=42
 )
 
-# ==========================
-# BUILD LSTM
-# ==========================
-model = Sequential([
-    Embedding(max_words,128,input_length=max_len),
+model = LogisticRegression(max_iter=1000)
 
-    LSTM(
-        128,
-        return_sequences=False
-    ),
+model.fit(X_train, y_train)
 
-    Dropout(0.3),
+pred = model.predict(X_test)
 
-    Dense(64,activation='relu'),
+print("Accuracy:", accuracy_score(y_test, pred))
 
-    Dense(1,activation='sigmoid')
-])
-
-model.compile(
-    optimizer='adam',
-    loss='binary_crossentropy',
-    metrics=['accuracy']
-)
-
-early_stop = EarlyStopping(
-    monitor='val_loss',
-    patience=3,
-    restore_best_weights=True
-)
-
-history = model.fit(
-    X_train,
-    y_train,
-    validation_split=0.2,
-    epochs=10,
-    batch_size=32,
-    callbacks=[early_stop]
-)
-
-loss, acc = model.evaluate(X_test,y_test)
-
-print(f"Accuracy : {acc:.4f}")
-
-# ==========================
-# SAVE MODEL
-# ==========================
-model.save("model/lstm_model.h5")
-
-with open("model/tokenizer.pkl","wb") as f:
-    pickle.dump(tokenizer,f)
-
-with open("model/max_len.pkl","wb") as f:
-    pickle.dump(max_len,f)
-
-print("Model Saved")
+pickle.dump(model, open("model/model.pkl", "wb"))
+pickle.dump(vectorizer, open("model/vectorizer.pkl", "wb"))

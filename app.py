@@ -1,99 +1,51 @@
 import streamlit as st
 import pickle
-import numpy as np
 
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-
-# =================================
-# PAGE CONFIG
-# =================================
 st.set_page_config(
-    page_title="LSTM Sentiment Analyzer",
-    page_icon="🤖",
-    layout="wide"
+    page_title="Sentiment Analysis",
+    page_icon="🤖"
 )
 
-# =================================
-# LOAD MODEL
-# =================================
 @st.cache_resource
-def load_assets():
+def load_model():
 
-    model = load_model("model/lstm_model.h5")
+    model = pickle.load(
+        open("model/model.pkl", "rb")
+    )
 
-    with open("model/tokenizer.pkl","rb") as f:
-        tokenizer = pickle.load(f)
+    vectorizer = pickle.load(
+        open("model/vectorizer.pkl", "rb")
+    )
 
-    with open("model/max_len.pkl","rb") as f:
-        max_len = pickle.load(f)
+    return model, vectorizer
 
-    return model, tokenizer, max_len
+model, vectorizer = load_model()
 
-model, tokenizer, max_len = load_assets()
-
-# =================================
-# HEADER
-# =================================
-st.title("🤖 Sentiment Analysis using LSTM")
+st.title("🤖 Sentiment Analysis")
 
 st.markdown("""
 ### Vanessa Santoso
-**NIM : 2702242171**
-
-Deep Learning Project - Long Short Term Memory (LSTM)
+**NIM: 2702242171**
 """)
 
-st.divider()
-
-# =================================
-# INPUT
-# =================================
 text = st.text_area(
-    "Masukkan Review",
-    height=200,
-    placeholder="Contoh: Produk sangat bagus dan pengiriman cepat"
+    "Masukkan Review"
 )
 
-# =================================
-# PREDICTION
-# =================================
-if st.button("Predict Sentiment"):
+if st.button("Predict"):
 
-    if text.strip() == "":
-        st.warning("Masukkan teks terlebih dahulu")
+    data = vectorizer.transform([text])
+
+    prediction = model.predict(data)[0]
+
+    probability = model.predict_proba(data).max()
+
+    if prediction == 1:
+        st.success("😊 Positif")
     else:
+        st.error("😡 Negatif")
 
-        seq = tokenizer.texts_to_sequences([text])
-
-        padded = pad_sequences(
-            seq,
-            maxlen=max_len,
-            padding='post'
-        )
-
-        score = model.predict(padded)[0][0]
-
-        if score >= 0.5:
-
-            st.success("😊 Sentimen Positif")
-
-            st.metric(
-                "Confidence",
-                f"{score*100:.2f}%"
-            )
-
-        else:
-
-            st.error("😡 Sentimen Negatif")
-
-            st.metric(
-                "Confidence",
-                f"{(1-score)*100:.2f}%"
-            )
-
-st.divider()
-
-st.write(
-    "Created by Vanessa Santoso (2702242171)"
-)
+    st.metric(
+        "Confidence",
+        f"{probability*100:.2f}%"
+    )
